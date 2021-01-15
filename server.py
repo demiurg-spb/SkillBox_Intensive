@@ -8,9 +8,10 @@ APP_NAME = 'SimChat'
 DB_PATH = 'messages.db'
 
 # константы с командами чат-бота
-BOT_HELP = 'БОТ'
-BOT_WORD = 'ЗНАЧЕНИЕ'
+BOT_NAME = 'БОТ'
+BOT_WORD = 'СЛОВО'
 BOT_ROAST = 'ТОСТ'
+BOT_MONEY = 'ВАЛЮТА'
 
 # инициализация серверного приложения
 app = Flask(APP_NAME)
@@ -72,19 +73,68 @@ def send_message():
             or not isinstance(text, str) or text == "":
         return abort(400)
 
-    if text.find(BOT_HELP) != -1:   #обработка команды бота (не вносится в список сообщений)
+    # обработка нового сообщения от пользователя, занесение его в базу сообщений
+    chat_database['messages'].append({
+        'user': user,
+        'time': time.time(),
+        'text': text
+    })
 
+    bot_message = None
+
+    # обработка команды бота (поиск значения слова)
+    if text.find(BOT_NAME + '.' + BOT_WORD) != -1:
+        try:
+            query_word = text.split(':')[1]
+            if query_word != '':
+                bot_message = f'Запрос на значение слова {query_word}'
+            else:
+                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
+        except:
+            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
+
+    # обработка команды бота (случайный тост)
+    elif text.find(BOT_ROAST) != -1:
+        try:
+            query_roast = text.split(':')[1]
+            if query_roast != '':
+                bot_message = f'Запрос на подходящий тост {query_roast}'
+            else:
+                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_ROAST}:ПОВОД, то я найду тост по ПОВОДУ'
+        except:
+            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_ROAST}:ПОВОД, то я найду тост по ПОВОДУ'
+
+    # обработка команды бота (перевод валюты)
+    elif text.find(BOT_MONEY) != -1:
+        try:
+            query_money_currency = text.split(':')[1]
+            query_money_amount = float(text.split(':')[2])
+            if query_money_currency != '':
+                bot_message = f'Запрос на перевод валюты {query_money_amount}{query_money_currency}'
+            else:
+                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_MONEY}:XXX:100, то я переведу 100 единиц валюты XXX в рубли по курсу ЦБ РФ'
+        except:
+            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_MONEY}:XXX:100, то я переведу 100 единиц валюты XXX в рубли по курсу ЦБ РФ'
+
+    elif text.find(BOT_NAME) != -1:
+        bot_message = f'''Привет, я чат-бот я кое-что умею: 
+    1. Я умею переводить валюту - команда {BOT_NAME}.{BOT_MONEY}:XXX:100
+    2. Я помогу найти подходящий тост - команда {BOT_NAME}.{BOT_ROAST}:ПОВОД
+    3. Я могу найти значения слов - команда {BOT_NAME}.{BOT_WORD}:СЛОВО'''
     else:
+        pass
+
+    if bot_message is not None:
         chat_database['messages'].append({
-            'user': user,
+            'user': BOT_NAME,
             'time': time.time(),
-            'text': text
+            'text': bot_message
         })
 
-        if save_db(chat_database, DB_PATH):
-            return {"result": "true"}
-        else:
-            return {"result": "false"}
+    if save_db(chat_database, DB_PATH):
+        return {"result": "true"}
+    else:
+        return {"result": "false"}
 
 
 # проверка новых сообщений и возвращение новых сообщений клиентскому приложению
