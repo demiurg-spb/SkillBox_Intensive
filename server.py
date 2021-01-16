@@ -73,6 +73,7 @@ def send_message():
     user = request.json.get('user')
     text = request.json.get('text')
 
+    #проверка сообщения на корректность
     if not isinstance(user, str) or user == "" \
             or not isinstance(text, str) or text == "":
         return abort(400)
@@ -90,18 +91,30 @@ def send_message():
     if text.upper().find(BOT_NAME + '.' + BOT_WORD) != -1:
         try:
             query_word = text.split(' ')[1]
+
             if query_word != '':
                 meanings = requests.get(WORD_URL + query_word).text
-                pattern = '<li>(.+?)<span class="example-fullblock'
-                matches = re.findall(pattern, meanings)
-                if len(matches):
+                meanings = re.sub("\n", "", meanings)
+                pattern_exist = '<li>(.+?)<span class="example-fullblock'
+                pattern_wrong = '<td><b>Такое написание слова ошибочно!.+?</td>'
+                matches_exist = re.findall(pattern_exist, meanings)
+                matches_wrong = re.findall(pattern_wrong, meanings)
+
+                # найдены значения искомого слова и их парсинг для вывода
+                if len(matches_exist):
                     bot_message = f'Значения слова "{query_word.capitalize()}":\n'
-                    pattern = '<.+?>|\[.+?\]|[^А-Яа-я., ]'
+                    pattern_exist = '<.+?>|\[.+?\]|[^А-Яа-я., ]'
                     count = 1
-                    for match in matches:
-                        bot_message += f'{count}. {re.sub(pattern, "", match)}\n'
+                    for match in matches_exist:
+                        bot_message += f'{count}. {re.sub(pattern_exist, "", match)}\n'
                         count += 1
+
+                # найдена подсказка о возможном неправильном написании
+                elif len(matches_wrong):
+                    pattern_wrong = '<.+?>'
+                    bot_message = re.sub(pattern_wrong, "", matches_wrong[0]) + '\n'
                 else:
+                # значения слова не найдены, равно как и подсказка об ошибке
                     bot_message = f'Я тоже не знаю, что значит слово "{query_word}"'
             else:
                 bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
@@ -134,6 +147,7 @@ def send_message():
             bot_message = f'''Пишите {BOT_NAME}.{BOT_MONEY} 123.45 XXX YYY - переведу 123.45 единиц XXX в YYY
 Нужно указать коды валют, и всё это по курсу ЦБ РФ на текущий момент'''
 
+    # обработка обращения к боту без знакомой команды - вывод подсказки
     elif text.upper().find(BOT_NAME) != -1:
         bot_message = f'''Привет, я чат-бот я кое-что умею: 
     1. Я умею переводить валюту - команда {BOT_NAME}.{BOT_MONEY} 100 XXX YYY
@@ -141,6 +155,7 @@ def send_message():
     else:
         pass
 
+    # было обращение к боту и сгенерирован его ответ - запись в базу
     if bot_message is not None:
         chat_database['messages'].append({
             'user': BOT_NAME,
@@ -148,6 +163,7 @@ def send_message():
             'text': bot_message
         })
 
+    # сохранение базы сообщений
     if save_db(chat_database, DB_PATH):
         return {"result": "true"}
     else:

@@ -2,14 +2,14 @@ import requests
 from server import APP_NAME, BOT_NAME
 
 # приветствие пользователя
-print(f'Добро пожаловать в {APP_NAME}\n\n')
+print(f'Добро пожаловать в {APP_NAME}\n')
 
 # цикл для выбора имени пользователя и ожидание подтверждения сервера о допустимости имени
 while True:
     my_name = input('Придумай себе ник: ')
     response = requests.post('http://127.0.0.1:5000/new_user', json={"new_name": my_name})
     if response.json().get('result'):
-        print(f'Теперь Вы можете отправлять сообщения в чат. Напишите "{BOT_NAME}", чтобы узнать, что умеет чат-бот.\n')
+        print(f'Теперь Вы можете отправлять сообщения в чат.\nНапишите "{BOT_NAME}", чтобы узнать, что умеет чат-бот.\n')
         break
     else:
         print(f'К сожалению, в чате уже есть пользователь с именем "{my_name}"\n')
