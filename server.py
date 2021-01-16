@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-from datetime import datetime
+import datetime
 import time
 import json
 import pickle
@@ -11,11 +11,16 @@ APP_NAME = 'SimChat'
 DB_PATH = 'messages.db'
 BANK_URL = 'https://www.cbr-xml-daily.ru/daily_json.js'
 WORD_URL = 'https://ru.wiktionary.org/wiki/'
+HOLY_URL = 'https://www.calend.ru/holidays/'
 
 # константы с командами чат-бота
 BOT_NAME = 'БОТ'
 BOT_WORD = 'СЛОВО'
 BOT_MONEY = 'ВАЛЮТА'
+BOT_HOLY = 'ПРАЗДНИК'
+MONTHS = ['января', 'февраля', 'марта', 'апреля',
+          'мая', 'июня', 'июля', 'августа',
+          'сентября', 'октября', 'ноября', 'декабря']
 
 # инициализация серверного приложения
 app = Flask(APP_NAME)
@@ -85,13 +90,13 @@ def send_message():
         'text': text
     })
 
+    # создаём пустое сообщение бота
     bot_message = None
 
     # обработка команды бота (поиск значения слова)
     if text.upper().find(BOT_NAME + '.' + BOT_WORD) != -1:
         try:
             query_word = text.split(' ')[1]
-
             if query_word != '':
                 meanings = requests.get(WORD_URL + query_word).text
                 meanings = re.sub("\n", "", meanings)
@@ -117,9 +122,9 @@ def send_message():
                     # значения слова не найдены, равно как и подсказка об ошибке
                     bot_message = f'Я тоже не знаю, что значит слово "{query_word}"'
             else:
-                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
+                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD} СЛОВО, то я найду значение этого СЛОВА'
         except:
-            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
+            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD} СЛОВО, то я найду значение этого СЛОВА'
 
     # обработка команды бота (перевод валюты)
     elif text.upper().find(BOT_NAME + '.' + BOT_MONEY) != -1:
@@ -148,11 +153,44 @@ def send_message():
             bot_message = f'''Пишите {BOT_NAME}.{BOT_MONEY} 123.45 XXX YYY - переведу 123.45 единиц XXX в YYY
 Нужно указать коды валют, и всё это по курсу ЦБ РФ на текущий момент'''
 
+    # обработка команды бота (праздники по дате)
+    elif text.upper().find(BOT_NAME + '.' + BOT_HOLY) != -1:
+        try:
+            query_holy = text.split(' ')[1]
+            holy_day = int(query_holy.split('.')[0])
+            holy_mth = int(query_holy.split('.')[1])
+            response = requests.get(HOLY_URL + f'{holy_mth}-{holy_day}')
+
+            #дата ввведена правильно и ответ сервера получен
+            if response.status_code == 200:
+                holidays = response.text
+                holidays = re.sub("\n", "", holidays)
+                pattern_holiday = '<div class="caption">.+?<a.+?>(.+?)</a>.+?<a.+?>(.+?)</a>'
+                matches = re.findall(pattern_holiday, holidays)
+
+                # найдены поля с информацией о праздниках
+                if len(matches):
+                    bot_message = f'Праздники {"%0d" % holy_day} {MONTHS[holy_mth-1]}:\n'
+                    count = 1
+                    for match in matches:
+                        bot_message += f'{count}. {match[0]} - {match[1]}\n'
+                        count += 1
+            else:
+                bot_message = f'''Напишете в формате {BOT_NAME}.{BOT_HOLY} DD.MM, то я расскажу про праздники
+                Нужно указать дату в формате день.месяц'''
+
+        except:
+            bot_message = f'''Напишете в формате {BOT_NAME}.{BOT_HOLY} DD.MM, то я расскажу про праздники
+Нужно указать дату в формате день.месяц'''
+
     # обработка обращения к боту без знакомой команды - вывод подсказки
     elif text.upper().find(BOT_NAME) != -1:
         bot_message = f'''Привет, я чат-бот я кое-что умею: 
     1. Я умею переводить валюту - команда {BOT_NAME}.{BOT_MONEY} 100 XXX YYY
-    2. Я могу найти значения слов - команда {BOT_NAME}.{BOT_WORD} СЛОВО'''
+    2. Я могу найти значения слов - команда {BOT_NAME}.{BOT_WORD} СЛОВО
+    3. Я всё про праздники - команда {BOT_NAME}.{BOT_HOLY} ДД.ММ'''
+
+    # если сообщение не содержит обращения к боту, то ничего не делаем
     else:
         pass
 
