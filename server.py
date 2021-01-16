@@ -1,16 +1,20 @@
-from flask import Flask, jsonify, request, abort
+from flask import Flask, request, abort
 from datetime import datetime
 import time
+import json
 import pickle
+import requests
+import re
 
 # константы для работы
 APP_NAME = 'SimChat'
 DB_PATH = 'messages.db'
+BANK_URL = 'https://www.cbr-xml-daily.ru/daily_json.js'
+WORD_URL = 'https://ru.wiktionary.org/wiki/'
 
 # константы с командами чат-бота
 BOT_NAME = 'БОТ'
 BOT_WORD = 'СЛОВО'
-BOT_ROAST = 'ТОСТ'
 BOT_MONEY = 'ВАЛЮТА'
 
 # инициализация серверного приложения
@@ -83,44 +87,57 @@ def send_message():
     bot_message = None
 
     # обработка команды бота (поиск значения слова)
-    if text.find(BOT_NAME + '.' + BOT_WORD) != -1:
+    if text.upper().find(BOT_NAME + '.' + BOT_WORD) != -1:
         try:
-            query_word = text.split(':')[1]
+            query_word = text.split(' ')[1]
             if query_word != '':
-                bot_message = f'Запрос на значение слова {query_word}'
+                meanings = requests.get(WORD_URL + query_word).text
+                pattern = '<li>(.+?)<span class="example-fullblock'
+                matches = re.findall(pattern, meanings)
+                if len(matches):
+                    bot_message = f'Значения слова "{query_word.capitalize()}":\n'
+                    pattern = '<.+?>|\[.+?\]|[^А-Яа-я., ]'
+                    count = 1
+                    for match in matches:
+                        bot_message += f'{count}. {re.sub(pattern, "", match)}\n'
+                        count += 1
+                else:
+                    bot_message = f'Я тоже не знаю, что значит слово "{query_word}"'
             else:
                 bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
         except:
             bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
 
-    # обработка команды бота (случайный тост)
-    elif text.find(BOT_ROAST) != -1:
-        try:
-            query_roast = text.split(':')[1]
-            if query_roast != '':
-                bot_message = f'Запрос на подходящий тост {query_roast}'
-            else:
-                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_ROAST}:ПОВОД, то я найду тост по ПОВОДУ'
-        except:
-            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_ROAST}:ПОВОД, то я найду тост по ПОВОДУ'
-
     # обработка команды бота (перевод валюты)
-    elif text.find(BOT_MONEY) != -1:
+    elif text.upper().find(BOT_NAME + '.' + BOT_MONEY) != -1:
         try:
-            query_money_currency = text.split(':')[1]
-            query_money_amount = float(text.split(':')[2])
-            if query_money_currency != '':
-                bot_message = f'Запрос на перевод валюты {query_money_amount}{query_money_currency}'
-            else:
-                bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_MONEY}:XXX:100, то я переведу 100 единиц валюты XXX в рубли по курсу ЦБ РФ'
-        except:
-            bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_MONEY}:XXX:100, то я переведу 100 единиц валюты XXX в рубли по курсу ЦБ РФ'
+            query_amount = float(text.split(' ')[1])
+            query_currency1 = text.split(' ')[2].upper()
+            query_currency2 = text.split(' ')[3].upper()
+            rates = json.loads(requests.get(BANK_URL).content)['Valute']
+            rates['RUR'] = {"Nominal": 1, "Value": 1}
 
-    elif text.find(BOT_NAME) != -1:
+            if query_currency1 not in rates.keys():
+                bot_message = f'''Я не знаю валюту {query_currency1}
+Пишите {BOT_NAME}.{BOT_MONEY} 123.45 XXX YYY - переведу 123.45 единиц XXX в YYY
+Нужно указать коды валют, и всё это по курсу ЦБ РФ на текущий момент'''
+            elif query_currency2 not in rates.keys():
+                bot_message = f'''Я не знаю валюту {query_currency2}
+Пишите {BOT_NAME}.{BOT_MONEY} 123.45 XXX YYY - переведу 123.45 единиц XXX в YYY
+Нужно указать коды валют, и всё это по курсу ЦБ РФ на текущий момент'''
+            else:
+                fr_rate = float(rates[query_currency1]['Value']) / float(rates[query_currency1]['Nominal'])
+                to_rate = float(rates[query_currency2]['Value']) / float(rates[query_currency2]['Nominal'])
+                result_amount = query_amount * fr_rate / to_rate
+                bot_message = f'По курсу ЦБ РФ {"%.2f" % query_amount} {query_currency1} = {"%.2f" % result_amount} {query_currency2}'
+        except:
+            bot_message = f'''Пишите {BOT_NAME}.{BOT_MONEY} 123.45 XXX YYY - переведу 123.45 единиц XXX в YYY
+Нужно указать коды валют, и всё это по курсу ЦБ РФ на текущий момент'''
+
+    elif text.upper().find(BOT_NAME) != -1:
         bot_message = f'''Привет, я чат-бот я кое-что умею: 
-    1. Я умею переводить валюту - команда {BOT_NAME}.{BOT_MONEY}:XXX:100
-    2. Я помогу найти подходящий тост - команда {BOT_NAME}.{BOT_ROAST}:ПОВОД
-    3. Я могу найти значения слов - команда {BOT_NAME}.{BOT_WORD}:СЛОВО'''
+    1. Я умею переводить валюту - команда {BOT_NAME}.{BOT_MONEY} 100 XXX YYY
+    2. Я могу найти значения слов - команда {BOT_NAME}.{BOT_WORD} СЛОВО'''
     else:
         pass
 
