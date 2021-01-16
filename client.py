@@ -9,7 +9,8 @@ while True:
     my_name = input('Придумай себе ник: ')
     response = requests.post('http://127.0.0.1:5000/new_user', json={"new_name": my_name})
     if response.json().get('result'):
-        print(f'Теперь Вы можете отправлять сообщения в чат.\nНапишите "{BOT_NAME}", чтобы узнать, что умеет чат-бот.\n')
+        print(f'Теперь Вы можете отправлять сообщения в чат.\n'
+              f'Напишите "{BOT_NAME}", чтобы узнать, что умеет чат-бот.\n')
         break
     else:
         print(f'К сожалению, в чате уже есть пользователь с именем "{my_name}"\n')

@@ -73,7 +73,7 @@ def send_message():
     user = request.json.get('user')
     text = request.json.get('text')
 
-    #проверка сообщения на корректность
+    # проверка сообщения на корректность
     if not isinstance(user, str) or user == "" \
             or not isinstance(text, str) or text == "":
         return abort(400)
@@ -95,7 +95,7 @@ def send_message():
             if query_word != '':
                 meanings = requests.get(WORD_URL + query_word).text
                 meanings = re.sub("\n", "", meanings)
-                pattern_exist = '<li>(.+?)<span class="example-fullblock'
+                pattern_exist = '<li>(.+?)<span class="example'
                 pattern_wrong = '<td><b>Такое написание слова ошибочно!.+?</td>'
                 matches_exist = re.findall(pattern_exist, meanings)
                 matches_wrong = re.findall(pattern_wrong, meanings)
@@ -114,7 +114,7 @@ def send_message():
                     pattern_wrong = '<.+?>'
                     bot_message = re.sub(pattern_wrong, "", matches_wrong[0]) + '\n'
                 else:
-                # значения слова не найдены, равно как и подсказка об ошибке
+                    # значения слова не найдены, равно как и подсказка об ошибке
                     bot_message = f'Я тоже не знаю, что значит слово "{query_word}"'
             else:
                 bot_message = f'Если напишете в формате {BOT_NAME}.{BOT_WORD}:СЛОВО, то я найду значение этого СЛОВА'
@@ -142,7 +142,8 @@ def send_message():
                 fr_rate = float(rates[query_currency1]['Value']) / float(rates[query_currency1]['Nominal'])
                 to_rate = float(rates[query_currency2]['Value']) / float(rates[query_currency2]['Nominal'])
                 result_amount = query_amount * fr_rate / to_rate
-                bot_message = f'По курсу ЦБ РФ {"%.2f" % query_amount} {query_currency1} = {"%.2f" % result_amount} {query_currency2}'
+                bot_message = f'По курсу ЦБ РФ {"%.2f" % query_amount} {query_currency1} = ' \
+                              f'{"%.2f" % result_amount} {query_currency2}'
         except:
             bot_message = f'''Пишите {BOT_NAME}.{BOT_MONEY} 123.45 XXX YYY - переведу 123.45 единиц XXX в YYY
 Нужно указать коды валют, и всё это по курсу ЦБ РФ на текущий момент'''
